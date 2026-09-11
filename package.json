@@ -1,6 +1,6 @@
 {
   "name": "discogs-typescript",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A modern, fully typed, zero-dependency TypeScript client for the Discogs API v2",
   "keywords": [
     "discogs",
