@@ -373,10 +373,13 @@ echo 'DISCOGS_TOKEN=…' > .env
 pnpm tsx --env-file=.env examples/crate-digging.ts
 ```
 
-TypeScript is deliberately held at 5.x while the rest of the toolchain tracks latest:
-typescript-eslint refuses to load under TS 7 ([#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940))
-and `@microsoft/api-extractor` cannot bundle declarations it emits, which would cost both
-type-aware linting and the single rolled-up `.d.ts`. Worth revisiting once both support it.
+TypeScript is deliberately held at 6.x while the rest of the toolchain tracks latest. TS 7.0
+ships no programmatic JS API, so typescript-eslint cannot read type information from it
+([#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940), locked by the
+maintainers until there is something to do) and `@microsoft/api-extractor` bundles its own
+compiler. Microsoft ships TS 6.0 to run side by side with 7.0 for exactly these tools, so 6.x
+is the newest version that keeps type-aware linting and the single rolled-up `.d.ts`. Worth
+revisiting when 7.1 ships the new API.
 
 ## Releasing
 
