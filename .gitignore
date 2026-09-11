@@ -5,3 +5,6 @@ coverage/
 .DS_Store
 .env
 .env.local
+
+# Ad-hoc crate-digging result dumps.
+crate-digging-*.md

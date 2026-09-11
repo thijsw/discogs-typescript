@@ -22,7 +22,10 @@
  *
  * Tune it with:
  *   GENRE=Electronic STYLE=Techno FORMAT=CD MAX_PRICE=15 MIN_RATING=4.2 MIN_VOTES=25 \
- *   CURRENCY=EUR PAGES=2 DISCOGS_TOKEN=… pnpm tsx examples/crate-digging.ts
+ *   CURRENCY=EUR PAGES=4 MIN_HAVE=100 MAX_CHECKS=40 pnpm tsx examples/crate-digging.ts
+ *
+ * `PAGES` widens the candidate pool at one request per page; `MIN_HAVE` and `MAX_CHECKS`
+ * decide how much of the 60-per-minute budget is spent pricing it up.
  */
 
 import {
@@ -44,7 +47,9 @@ const MAX_PRICE = Number(process.env['MAX_PRICE'] ?? '15')
 const MIN_RATING = Number(process.env['MIN_RATING'] ?? '4.2')
 const MIN_VOTES = Number(process.env['MIN_VOTES'] ?? '25')
 const CURRENCY = (process.env['CURRENCY'] ?? 'EUR') as Currency
-const PAGES = Number(process.env['PAGES'] ?? '2')
+const PAGES = Number(process.env['PAGES'] ?? '4')
+const MIN_HAVE = Number(process.env['MIN_HAVE'] ?? '100')
+const MAX_CHECKS = Number(process.env['MAX_CHECKS'] ?? '40')
 
 /** Pause once the remaining allowance drops this low, rather than earning a 429. */
 const THROTTLE_FLOOR = 4
@@ -118,9 +123,25 @@ for (let page = 1; page <= PAGES; page++) {
   if (page >= response.pagination.pages) break
 }
 
+/** How many people own a release, per the search result. Absent on some results. */
+function haveCount(result: SearchResult): number {
+  return result.community?.have ?? 0
+}
+
+// `database.search` has no sort parameter, so the pages above are an arbitrary slice of a
+// very large catalogue. Search results do carry `community.have` for free, though, which is
+// a decent proxy for how well known a record is — order by it and spend the request budget
+// on the plausible candidates instead of the long tail. Widening PAGES now costs one call
+// per page but buys a better-sorted pool, since MAX_CHECKS caps the expensive part.
+const shortlist = [...candidates.values()]
+  .filter((result) => haveCount(result) >= MIN_HAVE)
+  .sort((a, b) => haveCount(b) - haveCount(a))
+  .slice(0, MAX_CHECKS)
+
 console.log(
   `Scanned ${String(PAGES)} page(s) of ${GENRE}${STYLE ? ` / ${STYLE}` : ''} on ${FORMAT} — ` +
-    `${String(candidates.size)} distinct releases.`
+    `${String(candidates.size)} distinct releases, ${String(shortlist.length)} owned by ` +
+    `≥ ${String(MIN_HAVE)} people.`
 )
 console.log(
   `Keeping those rated ≥ ${String(MIN_RATING)} by ≥ ${String(MIN_VOTES)} people with a copy ` +
@@ -134,6 +155,7 @@ interface Hit {
   votes: number
   price: number
   forSale: number
+  have: number
   uri: string
 }
 
@@ -145,9 +167,9 @@ function progress(line: string): void {
   if (process.stdout.isTTY) process.stdout.write(`\r${line.padEnd(40, ' ')}`)
 }
 
-for (const release of candidates.values()) {
+for (const release of shortlist) {
   checked++
-  progress(`  checking ${String(checked)}/${String(candidates.size)}…`)
+  progress(`  checking ${String(checked)}/${String(shortlist.length)}…`)
 
   const community = await attempt(() => client.database.getCommunityReleaseRating(release.id))
   if (!community) continue
@@ -167,6 +189,7 @@ for (const release of candidates.values()) {
     votes: count,
     price: stats.lowest_price.value,
     forSale: stats.num_for_sale,
+    have: haveCount(release),
     uri: release.uri
   })
 }
@@ -176,15 +199,15 @@ progress('')
 hits.sort((a, b) => b.rating - a.rating || a.price - b.price)
 
 if (hits.length === 0) {
-  console.log('Nothing matched. Loosen MIN_RATING or raise MAX_PRICE.')
+  console.log('Nothing matched. Loosen MIN_RATING or MIN_HAVE, or raise MAX_PRICE or PAGES.')
 } else {
   console.log(`${String(hits.length)} match(es):\n`)
   for (const hit of hits) {
     const price = `${hit.price.toFixed(2)} ${CURRENCY}`
     console.log(`  ${hit.title} (${hit.year})`)
     console.log(
-      `    ${hit.rating.toFixed(2)}★ from ${String(hit.votes)} · ` +
-        `${price} · ${String(hit.forSale)} for sale`
+      `    ${hit.rating.toFixed(2)}★ from ${String(hit.votes)} · ${price} · ` +
+        `${String(hit.forSale)} for sale · ${String(hit.have)} own it`
     )
     console.log(`    https://www.discogs.com${hit.uri}`)
   }
