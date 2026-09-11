@@ -372,6 +372,25 @@ typescript-eslint refuses to load under TS 7 ([#10940](https://github.com/typesc
 and `@microsoft/api-extractor` cannot bundle declarations it emits, which would cost both
 type-aware linting and the single rolled-up `.d.ts`. Worth revisiting once both support it.
 
+## Releasing
+
+Releases are cut from a git tag. `npm version` writes the new version to `package.json`,
+commits it, and creates the matching tag:
+
+```bash
+npm version patch   # or minor / major
+git push --follow-tags
+```
+
+Pushing a `v*` tag runs [`.github/workflows/release.yml`](./.github/workflows/release.yml),
+which checks the tag against `package.json`, runs lint, typecheck, tests and the build,
+publishes to npm, and opens a GitHub Release with generated notes.
+
+The workflow publishes over [npm trusted publishing](https://docs.npmjs.com/trusted-publishers),
+so there is no npm token in the repository — CI exchanges a short-lived GitHub OIDC token for
+publish rights, and every release carries a provenance attestation linking the tarball back to
+the commit and workflow run that produced it.
+
 ## License
 
 MIT
