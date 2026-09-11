@@ -365,7 +365,13 @@ pnpm build         # vite library build → dist/
 ```
 
 Runnable examples live in [`examples/`](./examples) — `pnpm tsx examples/search.ts` and
-friends. They talk to the real API and need credentials in the environment.
+friends. They talk to the real API and need credentials in the environment. Put them in a
+gitignored `.env` and let tsx load it, rather than passing them on the command line:
+
+```bash
+echo 'DISCOGS_TOKEN=…' > .env
+pnpm tsx --env-file=.env examples/crate-digging.ts
+```
 
 TypeScript is deliberately held at 5.x while the rest of the toolchain tracks latest:
 typescript-eslint refuses to load under TS 7 ([#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940))
